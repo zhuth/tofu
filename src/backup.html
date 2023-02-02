@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
     <title>浏览备份</title>
-    <link rel="shortcut icon" href="images/icon-32x32.png" type="image/png">
     <link type="text/css" rel="stylesheet" href="vendor/bulma.min.css">
     <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
     <script src="vendor/zepto.min.js"></script>
@@ -25,9 +24,6 @@
     <nav class="navbar">
         <div class="container">
             <div class="navbar-brand">
-                <a class="navbar-item" href="https://doufen.org/" target="_blank">
-                    <img src="images/logo-main.png" alt="豆伴" title="豆伴">
-                </a>
                 <a role="button" class="navbar-burger">
                     <span aria-hidden="true"></span>
                     <span aria-hidden="true"></span>
@@ -39,11 +35,11 @@
                     <div class="navbar-item">
                         <div class="buttons">
                             <input class="file-input" type="hidden" id="restore-db" accept=".zip" multiple="false">
-                            <a class="button" href="options.html">
+                            <a class="button" href="#" id="reload">
                                 <span class="icon">
                                     <i class="fas fa-cog"></i>
                                 </span>
-                                <span>设置</span>
+                                <span>刷新</span>
                             </a>
                         </div>
                     </div>
@@ -243,7 +239,7 @@
             <progress class="progress is-info" value="0" max="100"></progress>
         </div>
     </div>
-    <script type="module" src="backup.js"></script>
+    <script src="backup.js"></script>
     
 </body>
 
