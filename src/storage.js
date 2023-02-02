@@ -47,9 +47,6 @@ const SCHEMA_LOCAL = [
  * Class Storage
  */
 export default class Storage {
-    static isDumping = false;
-    static isRestoring = false;
-
     constructor(userId = null) {
         this.userId = userId;
     }
@@ -96,6 +93,18 @@ export default class Storage {
         }).delete() > 0;
     }
 
+    async dropAll() {
+        const databases = await Dexie.getDatabaseNames();
+        for (var dbname of databases)
+            await Dexie.delete(dbname)
+        return true
+    }
+
+    async exists() {
+        const databases = await Dexie.getDatabaseNames();
+        return databases.length > 0
+    }
+
     async dump(onProgress) {
         if (this.constructor.isRestoring) {
             throw '正在恢复数据库';
@@ -129,7 +138,6 @@ export default class Storage {
                 });
                 db.close();
                 backupData[database + '.json'] = fflate.strToU8(dbJson);
-                onProgress(completed ++ / total);
             }
             backupData['database.json'] = fflate.strToU8(JSON.stringify({
                 'global': { 'version': SCHEMA_GLOBAL.length },
@@ -153,7 +161,7 @@ export default class Storage {
         }
     }
 
-    async restore(zipBuffer, onProgress) {
+    async restore() {
         if (this.constructor.isRestoring) {
             throw '正在恢复数据库';
         }
@@ -162,73 +170,37 @@ export default class Storage {
         }
         this.constructor.isRestoring = true;
 
-        const unzipFile = function (filename) {
-            return new Promise((resolve, reject) => {
-                fflate.unzip(zipBuffer, {
-                    filter(file) {
-                        return file.name == filename
-                    }
-                }, (error, data) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve(data[filename]);
-                    }
-                })
-            });
-        };
 
         try {
             var successes = [];
             var failures = [];
-            var unzippedFile = await unzipFile('database.json');
-            if (!unzippedFile) throw '压缩包内未找到数据库信息';
-
-            let dbMeta = JSON.parse(fflate.strFromU8(unzippedFile));
+            
+            let dbMeta = window.tofu['database'];
             if (dbMeta.global.version != SCHEMA_GLOBAL.length || dbMeta.local.version != SCHEMA_LOCAL.length) {
                 throw '数据库版本不一致';
             };
 
             var completed = 1;
             const total = dbMeta.local.files.length + 2;
-            onProgress(completed ++ / total);
-
-            let globalDbFilename = `${DB_NAME}.json`;
-            unzippedFile = await unzipFile(globalDbFilename);
-            if (!unzippedFile) throw `压缩包缺失文件："${globalDbFilename}"`;
-            let globalDb = JSON.parse(fflate.strFromU8(unzippedFile));
-            onProgress(completed ++ / total);
+            let globalDb = window.tofu[`${DB_NAME}`];
 
             await this.global.open();
             try {
                 for (let account of globalDb.account) {
                     let dbName = `${DB_NAME}[${account.userId}]`;
-                    let dbFilename = dbName + '.json';
-                    console.log(`importing ${dbFilename}`);
                     if (await this.global.account.get({userId: account.userId})) {
                         failures.push({
                             'database': dbName,
-                            'filename': dbFilename,
                             'error': '数据库已存在'
                         });
-                        onProgress(completed ++ / total);
                         continue;
                     }
-                    let dbFile = await unzipFile(dbFilename);
-                    if (!dbFile) {
-                        failures.push({
-                            'database': dbName,
-                            'filename': dbFilename,
-                            'error': '数据库文件缺失'
-                        });
-                        continue;
-                    }
-
+                    
                     let localDb = this.getLocalDb(account.userId);
                     await localDb.open();
                     try {
                         await new Promise((resolve, reject) => {
-                            importFromJsonString(localDb.backendDB(), fflate.strFromU8(dbFile), (error) => {
+                            importFromJsonString(localDb.backendDB(), JSON.stringify(window.tofu[dbName]), (error) => {
                                 if (error) {
                                     reject(error);
                                 } else {
@@ -239,18 +211,15 @@ export default class Storage {
                         await this.global.account.put(account);
                         successes.push({
                             'database': dbName,
-                            'filename': dbFilename
                         });
                     } catch (error) {
                         failures.push({
                             'database': dbName,
-                            'filename': dbFilename,
                             'error': error
                         });
                     } finally {
                         localDb.close();
                     }
-                    onProgress(completed ++ / total);
                 }    
             } finally {
                 this.global.close();

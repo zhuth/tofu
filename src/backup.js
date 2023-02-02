@@ -1,6 +1,5 @@
 'use strict';
 import Storage from './storage.js';
-import FileSaver from './vendor/FileSaver.js';
 
 const ACCOUNT_TEMPLATE = `\
 <article class="media box account">
@@ -200,10 +199,6 @@ class BackupDbModal {
         this.element.classList.remove('is-active');
         this.message.innerText = '';
     }
-
-    onProgress(progress) {
-        this.progressBar.value = parseInt(progress * 100);
-    }
 }
 
 class Toolbar {
@@ -218,57 +213,34 @@ class Toolbar {
 
     static render() {
         let toolbar = new Toolbar();
-        $('#reload').click(() => toolbar.reload());
-        $('#new-task').click(() => toolbar.newTask());
-        $('#backup-db').click(async () => {
-            if (!confirm('此操作可能需要耗时几分钟并占用大量内存。\r是否确定执行？')) return false;
-            let modal = new BackupDbModal('#backup-db-modal');
-            try {
-                modal.open('正在备份数据库。请不要关闭当前窗口');
-                let storage = new Storage();
-                let blob = new Blob([await storage.dump(progress => {
-                    modal.onProgress(progress);
-                })], {type: "application/zip"});
-                FileSaver.saveAs(blob, 'tofu-db-backup.zip');    
-            } catch (msg) {
-                alert(msg);
-            } finally {
-                modal.close();
-            }
-
-        });
-        $('#restore-db').change(async function () {
-            let dbFile = this.files[0];
-            if (!dbFile) return false;
-            let modal = new BackupDbModal('#backup-db-modal');
-            try {
-                modal.open('正在恢复数据库。请不要关闭当前窗口');
-                let storage = new Storage();
-                let buffer = new Uint8Array(await dbFile.arrayBuffer());
-                let result = await storage.restore(buffer, progress => {
-                    modal.onProgress(progress);
-                });
-                var message = `成功：${result.successes.length}\n`;
-                for (let success of result.successes) {
-                    message += `- ${success.database}\n`;
-                }    
-                message += `失败：${result.failures.length}\n`;
-                for (let failure of result.failures) {
-                    message += `- ${failure.database}：${failure.error}\n`;
-                }
-                setTimeout(() => {
-                    alert(message);
-                    location.reload();
-                }, 1);
-            } catch (msg) {
-                alert(msg);
-            } finally {
-                modal.close();
-            }
-        });
+        $('#reload').click(() => { let storage = new Storage(); storage.dropAll().then(() => toolbar.reload()) });
     }
 }
 
 TaskModal.init();
 AccountList.render();
 Toolbar.render();
+
+
+(async function () {
+    try {
+        let storage = new Storage();
+        if (await storage.exists()) return;
+        let result = await storage.restore();
+        var message = `成功：${result.successes.length}\n`;
+        for (let success of result.successes) {
+            message += `- ${success.database}\n`;
+        }    
+        message += `失败：${result.failures.length}\n`;
+        for (let failure of result.failures) {
+            message += `- ${failure.database}：${failure.error}\n`;
+        }
+        setTimeout(() => {
+            console.log(message);
+            location.reload();
+        }, 1);
+    } catch (msg) {
+        alert(msg);
+    } finally {
+    }
+})()

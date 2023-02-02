@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
+    "browserify": "^17.0.0",
+    "esmify": "^2.1.1",
+    "webpack-cli": "^5.0.1"
+  }
+}
