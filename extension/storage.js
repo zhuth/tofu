@@ -2,7 +2,6 @@
 import Dexie from './vendor/dexie.js';
 import { importFromJsonString, exportToJsonString } from './vendor/IDBExportImport.js';
 import * as fflate from './vendor/fflate.js';
-import BaseZip from './build.zip.js';
 
 const DB_NAME = 'tofu';
 
