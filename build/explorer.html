@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-    <title>浏览备份</title>
-    <link rel="shortcut icon" href="images/icon-32x32.png" type="image/png">
+    <title>豆瓣账号副本工具</title>
     <link type="text/css" rel="stylesheet" href="vendor/bulma.min.css">
     <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
     <script src="vendor/xlsx.full.min.js"></script>
     <script src="vendor/zepto.min.js"></script>
+    <script src="../db.js"></script>
     <style>
         figure { overflow: hidden; }
         .page-tab-content { margin-top: 3rem; max-width: 50rem;}
@@ -53,7 +53,7 @@
                                 </span>
                                 <span>返回</span>
                             </a>
-                            <a class="button" name="export" title="将该用户数据导出到 Excel 文件中">
+                            <!-- <a class="button" name="export" title="将该用户数据导出到 Excel 文件中">
                                 <span class="icon">
                                     <i class="fas fa-file-export"></i>
                                 </span>
@@ -70,7 +70,7 @@
                                     <i class="fas fa-file-upload"></i>
                                 </span>
                                 <span>上传图片</span>
-                            </a>
+                            </a> -->
                         </div>
                     </div>
                 </div>
@@ -483,7 +483,7 @@
         </div>
     </div>
 
-    <script type="module" src="explorer.js"></script>
+    <script src="explorer.js"></script>
 </body>
 
 </html>

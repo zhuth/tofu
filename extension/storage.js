@@ -2,6 +2,7 @@
 import Dexie from './vendor/dexie.js';
 import { importFromJsonString, exportToJsonString } from './vendor/IDBExportImport.js';
 import * as fflate from './vendor/fflate.js';
+import BaseZip from './build.zip.js';
 
 const DB_NAME = 'tofu';
 
@@ -139,6 +140,80 @@ export default class Storage {
                 }
             }));
 
+            return await new Promise((resolve, reject) => {
+                fflate.zip(backupData, (error, data) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(data);
+                    }
+                })
+            });
+        } finally {
+            this.constructor.isDumping = false;
+        }
+    }
+
+    async export(onProgress) {
+        if (this.constructor.isRestoring) {
+            throw '正在恢复数据库';
+        }
+        if (this.constructor.isDumping) {
+            throw '正在备份数据库';
+        }
+        this.constructor.isDumping = true;
+
+        const extractAll = function (zipBuffer) {
+            return new Promise((resolve, reject) => {
+                fflate.unzip(zipBuffer, {
+                }, (error, data) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(data);
+                    }
+                })
+            });
+        };
+
+        try {
+            var backupData = {}
+            const base = await fetch('/build.zip').then(res=>res.arrayBuffer())
+            const baseBuf = new Uint8Array(base)
+            backupData = fflate.unzipSync(baseBuf)
+            var dbFiles = [];
+
+            const databases = await Dexie.getDatabaseNames();
+            const total = databases.length;
+            var completed = 1;
+            var dbjs = 'window.tofu={};\n';
+            for (let database of databases) {
+                if (database != DB_NAME) {
+                    dbFiles.push(database);
+                }
+                let db = new Dexie(database);
+                await db.open();
+                let dbJson = await new Promise((resolve, reject) => {
+                    exportToJsonString(db.backendDB(), (error, jsonString) => {
+                        if (error) {
+                            reject(error);
+                        } else {
+                            resolve(jsonString);
+                        }
+                    })
+                });
+                db.close();
+                dbjs += 'window.tofu["' + database + '"]=' + dbJson + '\n'
+                onProgress(completed ++ / total);
+            }
+            dbjs += 'window.tofu["database"]=' + JSON.stringify({
+                'global': { 'version': SCHEMA_GLOBAL.length },
+                'local': {
+                    'version': SCHEMA_LOCAL.length,
+                    'files': dbFiles
+                }
+            }) + '\n'
+            backupData['db.js'] = fflate.strToU8(dbjs);
             return await new Promise((resolve, reject) => {
                 fflate.zip(backupData, (error, data) => {
                     if (error) {

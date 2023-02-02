@@ -235,6 +235,22 @@ class Toolbar {
             } finally {
                 modal.close();
             }
+        });
+        $('#export-db').click(async () => {
+            if (!confirm('此操作可能需要耗时几分钟并占用大量内存。\r是否确定执行？')) return false;
+            let modal = new BackupDbModal('#backup-db-modal');
+            try {
+                modal.open('正在导出数据库。请不要关闭当前窗口');
+                let storage = new Storage();
+                let blob = new Blob([await storage.export(progress => {
+                    modal.onProgress(progress);
+                })], {type: "application/zip"});
+                FileSaver.saveAs(blob, 'db-export.zip');    
+            } catch (msg) {
+                alert(msg);
+            } finally {
+                modal.close();
+            }
 
         });
         $('#restore-db').change(async function () {

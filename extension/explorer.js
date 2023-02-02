@@ -1901,7 +1901,7 @@ class Exporter {
     }
 
     save() {
-        let filename = `豆伴(${this.userId}).xlsx`;
+        let filename = `豆瓣账号导出(${this.userId}).xlsx`;
         XLSX.writeFile(this.workbook, filename);
     }
 }
