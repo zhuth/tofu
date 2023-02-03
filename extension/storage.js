@@ -96,6 +96,43 @@ export default class Storage {
         }).delete() > 0;
     }
 
+    async getAllDatabases(onProgress) {
+        const databases = await Dexie.getDatabaseNames();
+        const total = databases.length;
+        var dbFiles = [];
+        var completed = 1
+        var backupData = {};
+        for (let database of databases) {
+            if (database != DB_NAME) {
+                dbFiles.push(database);
+            }
+            let db = new Dexie(database);
+            await db.open();
+            let dbJson = await new Promise((resolve, reject) => {
+                exportToJsonString(db.backendDB(), (error, jsonString) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(jsonString);
+                    }
+                })
+            });
+            db.close();
+            backupData[database + '.json'] = dbJson;
+            onProgress(completed ++ / total);
+        }
+
+        backupData['database.json'] = JSON.stringify({
+            'global': { 'version': SCHEMA_GLOBAL.length },
+            'local': {
+                'version': SCHEMA_LOCAL.length,
+                'files': dbFiles
+            }
+        });
+
+        return backupData        
+    }
+
     async dump(onProgress) {
         if (this.constructor.isRestoring) {
             throw '正在恢复数据库';
@@ -105,40 +142,12 @@ export default class Storage {
         }
         this.constructor.isDumping = true;
 
+        var backupData = await this.getAllDatabases(onProgress)
+        for (var key in backupData) {
+            backupData[key] = fflate.strToU8(backupData[key])
+        }
+
         try {
-            var backupData = {};
-            var dbFiles = [];
-
-            const databases = await Dexie.getDatabaseNames();
-            const total = databases.length;
-            var completed = 1;
-            for (let database of databases) {
-                if (database != DB_NAME) {
-                    dbFiles.push(database);
-                }
-                let db = new Dexie(database);
-                await db.open();
-                let dbJson = await new Promise((resolve, reject) => {
-                    exportToJsonString(db.backendDB(), (error, jsonString) => {
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve(jsonString);
-                        }
-                    })
-                });
-                db.close();
-                backupData[database + '.json'] = fflate.strToU8(dbJson);
-                onProgress(completed ++ / total);
-            }
-            backupData['database.json'] = fflate.strToU8(JSON.stringify({
-                'global': { 'version': SCHEMA_GLOBAL.length },
-                'local': {
-                    'version': SCHEMA_LOCAL.length,
-                    'files': dbFiles
-                }
-            }));
-
             return await new Promise((resolve, reject) => {
                 fflate.zip(backupData, (error, data) => {
                     if (error) {
@@ -162,59 +171,20 @@ export default class Storage {
         }
         this.constructor.isDumping = true;
 
-        const extractAll = function (zipBuffer) {
-            return new Promise((resolve, reject) => {
-                fflate.unzip(zipBuffer, {
-                }, (error, data) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve(data);
-                    }
-                })
-            });
-        };
-
         try {
-            var backupData = {}
+            var backupData = await this.getAllDatabases(onProgress)
+            
             const base = await fetch('/build.zip').then(res=>res.arrayBuffer())
             const baseBuf = new Uint8Array(base)
-            backupData = fflate.unzipSync(baseBuf)
-            var dbFiles = [];
 
-            const databases = await Dexie.getDatabaseNames();
-            const total = databases.length;
-            var completed = 1;
             var dbjs = 'window.tofu={};\n';
-            for (let database of databases) {
-                if (database != DB_NAME) {
-                    dbFiles.push(database);
-                }
-                let db = new Dexie(database);
-                await db.open();
-                let dbJson = await new Promise((resolve, reject) => {
-                    exportToJsonString(db.backendDB(), (error, jsonString) => {
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve(jsonString);
-                        }
-                    })
-                });
-                db.close();
-                dbjs += 'window.tofu["' + database + '"]=' + dbJson + '\n'
-                onProgress(completed ++ / total);
+            for (var dbName in backupData) {
+                dbjs += 'window.tofu["' + dbName.split('.')[0] + '"]=' + backupData[dbName] + ';\n'
             }
-            dbjs += 'window.tofu["database"]=' + JSON.stringify({
-                'global': { 'version': SCHEMA_GLOBAL.length },
-                'local': {
-                    'version': SCHEMA_LOCAL.length,
-                    'files': dbFiles
-                }
-            }) + '\n'
-            backupData['db.js'] = fflate.strToU8(dbjs);
+            
+            let exported = Object.assign({}, fflate.unzipSync(baseBuf), {'db.js': fflate.strToU8(dbjs)})
             return await new Promise((resolve, reject) => {
-                fflate.zip(backupData, (error, data) => {
+                fflate.zip(exported, (error, data) => {
                     if (error) {
                         reject(error);
                     } else {
